@@ -23,7 +23,8 @@ class NotesTests(CliCase):
 
     def test_invalid_notes_do_not_write(self):
         self.cli('init')
-        for bad in ('', 'two\nlines', 'x' * 281, '\u00e9' * 141):
+        for bad in ('', 'two\nlines', 'two\rlines', 'escape\x1bsequence', 'delete\x7fcharacter',
+                    'vertical\vtab', 'form\ffeed', 'x' * 281, '\u00e9' * 141):
             self.cli('note', bad, code=2)
         self.assertEqual(self.notes(), [])
 

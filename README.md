@@ -9,20 +9,49 @@ or global agent configuration. Your existing coding agent writes the summaries.
 
 ## Install into a project
 
-Clone this repository, then run this once for the project that should use memory:
+Run **`install.py` once for each project repository** that should use shared memory.
+On this machine, the installer is at:
 
-```sh
-python install.py /path/to/your-project
+```text
+A:\Claude\opt-mem2\install.py
 ```
 
-Windows example, from any directory:
+The argument is the **root directory of your existing project repository**: the
+folder containing that project's `.git` entry. `A:\Claude\YourProject` below is an
+example; replace it with your actual project path. Keep the entire OptMM source
+folder together while installing. The installed project is self-contained afterward.
+
+### 1. Run the installer
+
+On Windows, run this in PowerShell from any directory. Confirm the version is
+Python 3.10 or newer:
 
 ```powershell
+python --version
 python "A:\Claude\opt-mem2\install.py" "A:\Claude\YourProject"
 ```
 
-Use `python3` on systems where that is the Python 3 command, or `py -3` on Windows.
-Check `python --version` first. The target directory must already exist.
+If Windows provides Python through `py -3`, use that in place of `python` in these
+commands. The target directory must already exist.
+
+On Ubuntu or WSL, use Linux Python and replace these paths with the locations of
+your OptMM checkout and target project:
+
+```sh
+python3 --version
+python3 "/home/you/opt-mem2/install.py" "/home/you/your-project"
+```
+
+To use this machine's existing Windows source folder from WSL, if `A:` is mounted
+at `/mnt/a`, the equivalent command is:
+
+```sh
+python3 "/mnt/a/Claude/opt-mem2/install.py" "/home/you/your-project"
+```
+
+For WSL, keeping the project in the Linux filesystem (for example, under `/home/you`)
+improves file-access performance compared with a mounted Windows drive such as
+`/mnt/c` or `/mnt/a`. See Microsoft's [WSL filesystem guidance](https://learn.microsoft.com/en-us/windows/wsl/filesystems).
 
 The installer adds:
 
@@ -41,17 +70,57 @@ your-project/
     cache/                      Local summaries and locks; ignored by Git
 ```
 
-Review and commit the setup in the target project:
+### 2. Verify it inside your project
+
+On Windows:
+
+```powershell
+cd "A:\Claude\YourProject"
+python optmm.py check
+python optmm.py wake
+```
+
+On Ubuntu or WSL:
 
 ```sh
+cd "/home/you/your-project"
+python3 optmm.py check
+python3 optmm.py wake
+```
+
+`check` should report `OK`. A newly installed, empty store should say `No memories
+yet.` and `You are awake.` If the project already has memories and requests `nap`
+tasks, have your coding agent complete them and run `wake` again.
+
+Start a new coding-agent session in the project so it reads the installed
+`AGENTS.md` or `CLAUDE.md` instructions. Those instructions tell it to read memory,
+record useful discoveries, and write requested summaries.
+
+### 3. Commit the installation and share it
+
+From the target project's root, review and commit the installed files:
+
+```sh
+git status --short
 git add optmm.py .optmm .gitignore AGENTS.md CLAUDE.md
+git diff --cached
 git commit -m "Add shared project memory"
 ```
 
-**After that commit, teammates just clone/pull the project.** They do not need this
+Share that commit through your normal push or pull-request workflow. The installer
+does not commit or push for you. The generated `.gitignore` rules exclude the local
+cache and temporary files.
+
+### 4. Teammates clone or pull, then use memory
+
+**After the setup commit is shared, teammates just clone/pull the project.** They do not need this
 OptMM source checkout, pip, a setup command, environment variables, or Git config.
-Their agent runs `python optmm.py wake`; the local cache is created on first use.
+They need Python 3.10+ available to their coding agent. From their project root,
+the agent runs `python optmm.py wake` (`python3 optmm.py wake` on Ubuntu/WSL);
+the local cache is created on first use.
 The installed launcher also works by absolute path from another working directory.
+
+### Choose which agent instructions to install
 
 By default both instruction files are updated. Choose a different integration with:
 
@@ -60,6 +129,11 @@ python install.py /path/to/project --instructions agents
 python install.py /path/to/project --instructions claude
 python install.py /path/to/project --instructions none
 ```
+
+Run these examples from the OptMM source folder, or replace `install.py` with its
+full path as above. If you choose fewer instruction files, include only the files
+that were actually updated in the setup commit. With `--instructions none`, add
+the memory workflow to your agent's own instructions yourself.
 
 Existing text outside the marked OptMM blocks is preserved. The marked blocks
 belong to the installer and are refreshed on upgrade; put team customizations
@@ -170,8 +244,9 @@ python optmm.py import /path/to/old/memory/LOG.txt
 
 Accepted UTF-8 records are `#N YYYY-MM-DD text` (including original fixed-width
 padding) or `YYYY-MM-DD text`. Dates and text are preserved; dates become UTC
-midnight timestamps with microsecond offsets for same-day ordering. Original
-numbered IDs are replaced with deterministic permanent IDs. The old file is never
+midnight timestamps with microsecond offsets for same-day ordering. Internal tabs
+and Unicode separators are preserved; LF/CRLF delimit records. Original numbered
+IDs are replaced with deterministic permanent IDs. The old file is never
 changed. The entire input is validated before any note is published.
 
 Reimporting the same records in the same order is idempotent, including resuming

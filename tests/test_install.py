@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -51,6 +52,23 @@ class InstallTests(CliCase):
         self.assertIn('modified', result.stderr.lower())
         self.assertEqual(path.read_bytes(), before)
 
+    def test_invalid_manifest_checksums_fail_without_changing_files(self):
+        self.install()
+        launcher = self.repo / 'optmm.py'
+        launcher.write_bytes(launcher.read_bytes() + b'\n# Local customization.\n')
+        path = self.repo / '.optmm/install.json'
+        manifest = json.loads(path.read_text(encoding='utf-8'))
+        for invalid in ({}, [], None, True, 42, 'short', 'g' * 64):
+            with self.subTest(checksum=invalid):
+                manifest['files']['optmm.py'] = invalid
+                path.write_text(json.dumps(manifest), encoding='utf-8')
+                before = {p.relative_to(self.repo): p.read_bytes() for p in self.repo.rglob('*') if p.is_file()}
+                result = self.install(code=2)
+                self.assertIn('Invalid installation manifest', result.stderr)
+                self.assertNotIn('Traceback', result.stderr)
+                self.assertEqual(before, {p.relative_to(self.repo): p.read_bytes()
+                                          for p in self.repo.rglob('*') if p.is_file()})
+
     def test_git_line_ending_conversion_does_not_block_reinstall(self):
         self.install()
         path = self.repo / '.optmm/runtime/optmm/store.py'
@@ -63,6 +81,27 @@ class InstallTests(CliCase):
         result = self.install(code=2)
         self.assertIn('markers', result.stderr)
         self.assertFalse((self.repo / 'optmm.py').exists())
+
+    def test_interrupted_write_files_are_excluded_from_git(self):
+        self.git('init', '-b', 'main')
+        self.install()
+        suffix = 'a' * 32 + '.tmp'
+        temporary_files = [
+            f'.optmm/.config.json.{suffix}', f'.optmm/.install.json.{suffix}',
+            f'.optmm/.README.md.{suffix}', f'.optmm/runtime/optmm/.cli.py.{suffix}',
+            f'.optmm/notes/.' + 'b' * 32 + f'.json.{suffix}',
+            f'.optmm/notes/..gitkeep.{suffix}', f'.optmm.py.{suffix}',
+            f'.AGENTS.md.{suffix}', f'.CLAUDE.md.{suffix}', f'..gitignore.{suffix}',
+        ]
+        for name in temporary_files:
+            (self.repo / name).write_bytes(b'Interrupted unpublished write')
+        (self.repo / '.unrelated.tmp').write_bytes(b'Unrelated project file')
+        self.git('add', '.')
+        tracked = set(self.git('ls-files').splitlines())
+        self.assertFalse(tracked.intersection(temporary_files))
+        self.assertIn('.unrelated.tmp', tracked)
+        for name in ('optmm.py', '.optmm/config.json', '.optmm/install.json', '.optmm/runtime/optmm/cli.py'):
+            self.assertIn(name, tracked)
 
     def test_clone_needs_no_installer_or_source_checkout(self):
         self.git('init', '-b', 'main')

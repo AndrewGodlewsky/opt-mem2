@@ -11,7 +11,8 @@ def import_notes(store, filename):
     source = Path(filename).read_text(encoding='utf-8')
     records = []
     day_counts = {}
-    for line_number, line in enumerate(source.splitlines(), 1):
+    # read_text normalizes CR/LF; Unicode separators may be part of a memory.
+    for line_number, line in enumerate(source.split('\n'), 1):
         if not line.strip():
             continue
         match = re.fullmatch(r'(?:#\d+ )?(\d{4}-\d{2}-\d{2}) (.*)', line.rstrip())

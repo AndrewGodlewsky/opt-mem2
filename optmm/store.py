@@ -31,8 +31,8 @@ def digest(value):
 
 def text_line(text, limit=280):
     text = text.strip()
-    if not text or any(ord(c) < 32 or ord(c) == 127 for c in text):
-        raise MemoryError('A memory must be one nonempty line without control characters.')
+    if not text or any(c != '\t' and (ord(c) < 32 or ord(c) == 127) for c in text):
+        raise MemoryError('A memory must be one nonempty line; tabs are the only allowed control characters.')
     if len(text.encode('utf-8')) > limit:
         raise MemoryError(f'Too long: limit is {limit} UTF-8 bytes.')
     return text

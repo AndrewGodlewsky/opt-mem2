@@ -1,6 +1,7 @@
 """Vendor a self-contained runtime without changing global settings or Git hooks."""
 import hashlib
 from pathlib import Path
+import re
 
 from . import __version__
 from .store import MemoryError, Store, atomic_bytes, directory, encoded, read_json
@@ -74,7 +75,11 @@ IGNORE = '''# OptMM: share source notes and runtime; keep generated work local.
 !/.optmm/runtime/**
 !/optmm.py
 /.optmm/cache/
-/.optmm/notes/.*.tmp
+/.optmm/**/.*.tmp
+/.optmm.py.*.tmp
+/.AGENTS.md.*.tmp
+/.CLAUDE.md.*.tmp
+/..gitignore.*.tmp
 '''
 
 
@@ -131,6 +136,9 @@ def install(target, instructions='both'):
             manifest = read_json(manifest_path)
             if not isinstance(manifest, dict) or manifest.get('schema') != 1 or not isinstance(manifest.get('files'), dict):
                 raise ValueError('unexpected manifest structure')
+            if any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value)
+                   for value in manifest['files'].values()):
+                raise ValueError('expected SHA-256 checksum strings in files')
             previous = manifest['files']
         except (ValueError, TypeError) as exc:
             raise MemoryError(f'Invalid installation manifest: {exc}') from exc
